@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visioncache"
+version = "0.1.0"
+description = "Adaptive screenshot observations for Windows computer-use agents"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["Pillow>=11.2.1,<14"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.13.1,<2"]
+test = ["pytest>=8,<10", "mcp>=1.13.1,<2"]
+
+[project.scripts]
+visioncache-mcp = "visioncache.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
