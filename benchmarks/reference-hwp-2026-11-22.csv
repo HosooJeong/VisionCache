@@ -1,7 +1,7 @@
-cache,readiness,model,mode,attempts,successes,api_calls,api_cost_usd,usd_per_success,median_completion_seconds
-implicit,before_stable_wait,gpt-6.2-sol,full,3,3,12,0.0231336,0.0077112000000000005,7.025194699992426
-implicit,before_stable_wait,gpt-6.2-sol,adaptive_delta,3,3,12,0.018162,0.006054,6.911435299902223
-off,before_stable_wait,gpt-6.2-sol,full,3,1,6,0.01331,0.01331,6.43360049999319
-off,before_stable_wait,gpt-6.2-sol,adaptive_delta,3,2,9,0.013980000000000001,0.0069900000000000006,6.471398650028277
-off,stable_wait,gpt-6.2-sol,full,3,3,12,0.028758000000000002,0.009586,7.563659000094049
-off,stable_wait,gpt-6.2-sol,adaptive_delta,3,3,12,0.018162,0.006054,7.436372099909931
+cache,readiness,model,mode,attempts,successes,api_calls,api_cost_usd,usd_per_success,median_completion_seconds,input_tokens,cached_input_tokens,cache_write_tokens,output_tokens
+implicit,before_stable_wait,gpt-6.2-sol,full,3,3,12,0.0231336,0.0077112000000000005,7.025194699992426,12564,4001,3955,363
+implicit,before_stable_wait,gpt-6.2-sol,adaptive_delta,3,3,12,0.018162,0.006054,6.911435299902223,7266,0,0,363
+off,before_stable_wait,gpt-6.2-sol,full,3,1,6,0.01331,0.01331,6.43360049999319,5550,0,0,221
+off,before_stable_wait,gpt-6.2-sol,adaptive_delta,3,2,9,0.013980000000000001,0.0069900000000000006,6.471398650028277,5525,0,0,293
+off,stable_wait,gpt-6.2-sol,full,3,3,12,0.028758000000000002,0.009586,7.563659000094049,12564,0,0,363
+off,stable_wait,gpt-6.2-sol,adaptive_delta,3,3,12,0.018162,0.006054,7.436372099909931,7266,0,0,363

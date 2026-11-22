@@ -1,0 +1,32 @@
+{
+  "name": "visioncache",
+  "version": "0.2.1",
+  "description": "Window-scoped desktop computer use for AI agents over MCP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HosooJeong/VisionCache.git"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "visioncache": "cli.cjs"
+  },
+  "files": [
+    "INSTALL.md",
+    "cli.cjs",
+    "native/visioncache-mcp.exe",
+    "licenses",
+    "skill/SKILL.md"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

@@ -1,5 +1,6 @@
 """Run from the repo root with python -m tests.windows_mcp_smoke."""
 
+import argparse
 import asyncio
 import base64
 from io import BytesIO
@@ -15,7 +16,7 @@ from PIL import Image
 from benchmarks.fixture import Fixture, make_task
 
 
-async def check():
+async def check(server=None):
     fixture = Fixture()
     fixture.root.title("VisionCache MCP fixture")
     fixture.root.lift()
@@ -28,13 +29,21 @@ async def check():
             fixture.update()
             await asyncio.sleep(0.015)
 
-    params = StdioServerParameters(command=sys.executable, args=["-m", "visioncache.mcp_server"])
+    if server:
+        params = StdioServerParameters(command=server, args=[])
+    else:
+        params = StdioServerParameters(command=sys.executable, args=["-m", "visioncache.mcp_server"])
     pump = asyncio.create_task(pump_ui())
     try:
         with anyio.fail_after(35):
             async with stdio_client(params) as (reader, writer):
                 async with ClientSession(reader, writer) as client:
                     await client.initialize()
+                    # Starting a stdio subprocess can shift foreground focus on Windows.
+                    # Bring the disposable fixture back to the foreground after startup.
+                    fixture.root.lift()
+                    fixture.root.focus_force()
+                    fixture.update()
                     registered = {tool.name for tool in (await client.list_tools()).tools}
                     assert registered == {
                         "list_windows", "observe_window", "map_point", "click",
@@ -148,4 +157,6 @@ async def check():
 
 
 if __name__ == "__main__":
-    asyncio.run(check())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--server", help="Path to the standalone MCP executable.")
+    asyncio.run(check(parser.parse_args().server))

@@ -1,75 +1,79 @@
-# VisionCache Windows 벤치마크
+# VisionCache Windows benchmarks
 
-Windows의 테스트용 재고 입력 앱에서 동일한 작업을 네 가지 화면 전달 방식으로 비교한다. 외부 업무 앱을 열지 않으며 모델 동작은 이 테스트 창으로 제한된다.
+These live API benchmarks use the Python reference implementation of VisionCache. The [main README](../README.md) covers the Rust release and its integration tests.
 
-| 모드 | 모델에게 주는 이미지 |
+## Stock intake fixture
+
+The fixture runs the same Windows stock-intake tasks with four capture policies. All model actions are scoped to a disposable test window.
+
+| Mode | Images sent to the model |
 | --- | --- |
-| `full` | 테스트 창 원본 `1024×640` 전체 |
-| `resized` | 테스트 창 전체를 축소한 이미지. 기본 `512×320` |
-| `resized_delta` | 동일한 축소 전체 화면과 직전 캡처 대비 변경 영역의 원본 크롭. 첫 프레임, 변화 없음, 크롭 면적이 원본의 25%를 넘는 경우에는 축소 화면만 보냄 |
-| `adaptive_delta` | 동일한 축소 전체 화면에 작은 글씨나 붉은 경고 문구로 감지된 변경 영역만 원본으로 추가 |
+| `full` | The full test window at its native resolution of 1024×640 |
+| `resized` | The full test window scaled to 512×320 by default |
+| `resized_delta` | The scaled image plus a native-resolution crop of the changed region |
+| `adaptive_delta` | The scaled image plus a native-resolution crop when changes contain small text or red warnings |
 
-`adaptive_delta`는 화면 픽셀로 판단한다. 붉은 텍스트가 새로 생겼거나, 변경된 글자의 획 높이가 축소본에서 6픽셀 이하로 추정되면 주변 여백을 포함해 원본을 자른다. 첫 프레임, 감지할 단서가 없는 변화, 크롭 면적이 원본의 25%를 넘는 경우에는 축소 화면만 보낸다. 오류의 뜻을 읽는 방식은 아니므로 다른 앱의 테마와 글꼴에서는 감지 성능을 다시 검증해야 한다.
+Both crop modes send just the scaled window on the first frame, when nothing changes, or when a crop would cover more than 25% of the source. The adaptive policy uses pixel changes and color. It adds a padded native crop when new red text appears or when a changed glyph's stroke height in the scaled image is estimated at six pixels or less. App themes and font sizes can affect detection.
 
-## Windows PowerShell에서 실행
+### Run on Windows
 
-Python 3.10 이상과 Tkinter가 있는 대화형 Windows 데스크톱이 필요하다. 테스트 창이 열리면 조작하지 않은 상태로 둔다. 중단하려면 창을 닫거나 콘솔에서 Ctrl+C를 누른다.
+Use Python 3.10 or later with Tkinter on an interactive Windows desktop. Leave the test window alone during the run. Close it or press Ctrl+C in the terminal to stop.
 
 ```powershell
 python -m pip install -e .
 python -m benchmarks.run --smoke
 ```
 
-`--smoke`는 실제 Windows 창과 캡처 경로를 사용하고 사전에 정한 좌표 동작으로 검증한다. API 호출이 없어 비용 칸은 비어 있다.
+`--smoke` runs the native Windows capture path and uses scripted input coordinates. It makes no API calls.
 
-유효한 OpenAI API 키가 현재 PowerShell의 `OPENAI_API_KEY`에 설정돼 있으면 아래 명령으로 실측한다. API에 전송하는 화면과 입력값은 재고 입력 테스트에서 생성한 가상 데이터다.
+For live measurements, set `OPENAI_API_KEY` in the current PowerShell session. The fixture generates synthetic screen content and input values for the API requests.
 
 ```powershell
-# 현재 세션에 키가 설정돼 있지 않을 때만 실행
+# Run only if the current session needs an API key.
 $env:OPENAI_API_KEY = [System.Net.NetworkCredential]::new('', (Read-Host 'OpenAI API key' -AsSecureString)).Password
 
-# 빠른 실측. 시나리오 2개 × 방식 4개 × 1회
+# Quick run with one trial per scenario and mode.
 python -m benchmarks.run --repeats 1
 
-# 기본 실측. 시나리오 2개 × 방식 4개 × 3회
+# Default run with three trials per scenario and mode.
 python -m benchmarks.run
 
-# 모드마다 실행 순서를 한 번씩 균형 있게 배치
+# Balance the run order across all four modes.
 python -m benchmarks.run --repeats 4
 
-# 오류 복구만 반복하고 결과를 다른 경로에 저장
+# Repeat error recovery and write results to a separate directory.
 python -m benchmarks.run --scenario recover-bin --repeats 6 --output .\benchmark-results
 ```
 
-기본 모델은 `gpt-6.2-sol`이다. 네 방식 모두 같은 모델과 요청 설정을 쓰고, 관찰마다 현재 이미지와 직전 동작만 준다. `--model`로 모델을, `--scale`로 축소 비율을 바꿀 수 있다. `--rates INPUT CACHED WRITE OUTPUT`에는 선택한 모델의 100만 토큰당 USD 단가를 기존 단가 대신 넣을 수 있다. 모델은 Responses API 이미지 입력, Structured Outputs, low reasoning, 30분 프롬프트 캐시 설정을 지원해야 한다.
+The default model is `gpt-6.2-sol`. All modes use the same model and request settings, with the current images and previous action on each observation. Change the model with `--model` or the scale with `--scale`. Use `--rates INPUT CACHED WRITE OUTPUT` to override the rates in USD per million tokens. The selected model must support image input, Structured Outputs, low reasoning effort, and the 30-minute prompt cache setting on the Responses API.
 
-## 실행 결과 읽기
+### Read the results
 
-실행마다 `benchmarks/results/live-…/` 또는 `benchmarks/results/smoke-…/`에 결과를 저장한다.
+Each run saves results to `benchmarks/results/live-…/` or `benchmarks/results/smoke-…/`.
 
-| 파일 | 내용 |
+| File | Contents |
 | --- | --- |
-| `summary.csv` | 전체 및 시나리오별 성공률, 사용량 기준 총 USD, 성공 1건당 USD, 성공 실행의 중앙 완료 시간 |
-| `trials.csv` | 개별 시도의 결과 및 소요 시간, 토큰, API 호출 횟수, 비용 |
-| `turns.jsonl` | 단계별 이미지 크기와 영역, 크롭 선택 이유, 동작 및 변환 좌표, API 응답 ID, 실제 토큰 사용량 및 API 왕복 시간 |
-| `run.json` | 모델, 단가, 시드, 반복 수, 예정 및 실행 건수, 중단 여부 |
+| `summary.csv` | Success rate, usage-based USD cost, cost per success, and median completion time by mode and scenario |
+| `trials.csv` | Outcome, elapsed time, token usage, API calls, and cost per trial |
+| `turns.jsonl` | Image dimensions and bounds, crop reason, action and mapped coordinates, API response ID, usage, and API round-trip time per turn |
+| `run.json` | Model, rates, seed, repetition count, planned and executed trial counts, and interruption status |
 
-- **성공 판정**은 모델의 완료 응답과 별개로, 앱에 SKU·수량·보관함·확인 코드가 모두 맞게 저장됐는지 확인한다. 두 시나리오 모두 확인 코드를 화면에서 읽어야 한다. `recover-bin`은 추가로 앱이 제시하는 대체 보관함을 사용한다. 한 반복 안에선 네 방식에 같은 값을 주고, 반복마다 방식의 실행 순서를 회전한다.
-- **비용**은 Responses API가 돌려준 실제 토큰 사용량에 Standard 요율을 적용한 USD 값이다. 일반 입력, 캐시 적중, 캐시 생성 및 출력(추론 포함)을 각각 계산한다. 성공 1건당 비용은 실패 시도 비용도 포함한 합계를 성공 건수로 나눈다. 사용량이 누락된 요청이 있으면 해당 합계는 비워 두며, `known_api_cost_usd`에는 확인된 부분만 기록한다. 계정별 할인·크레딧은 결제 내역에서 확인한다. [OpenAI 요금표](https://developers.openai.com/api/docs/pricing) · [Prompt caching 비용](https://developers.openai.com/api/docs/guides/prompt-caching)
-- **완료 시간**은 초기 상태가 준비된 뒤 첫 화면 캡처부터 마지막 동작 및 앱 상태 판정까지다. 이미지 처리, API 요청, GUI 조작을 포함한다. `median_completion_seconds`는 성공 건에 한해 집계한다. 성공과 실패를 모두 포함한 시간은 `median_attempt_seconds`에 있다.
-- **해석 범위**는 이 창과 두 작업에 한정된다. 확인 코드와 오류 안내는 의도적으로 작은 글씨로 배치했다. 다른 앱이나 글꼴 배율에서 성능을 일반화하려면 해당 앱으로 다시 측정해야 한다.
+- A trial succeeds when the app saves the correct SKU, quantity, bin, and confirmation code. The agent reads the confirmation code from the screen in both scenarios. In `recover-bin`, it also uses the fallback bin shown by the app. Each repetition shares the same task values across all four modes and rotates their order.
+- The cost calculation applies the run's rates to the actual usage returned by the API, with separate rates for uncached input, cache hits, cache writes, and output. Cost per success divides the cost of all attempts by the number of successes. If any request lacks usage, the affected total is blank and `known_api_cost_usd` records the portion with available usage. [API pricing](https://developers.openai.com/api/docs/pricing) · [Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)
+- The clock starts with the first capture once the window is ready and stops at final validation. This includes image processing, API requests, and GUI input. `median_completion_seconds` uses successful trials and `median_attempt_seconds` uses all trials.
+- The stock-intake fixture deliberately uses small text for the confirmation code and the error message. Results reflect this window and these two tasks. [Stock intake results](reference-2026-11-22.csv)
 
-## 한글 2020 실앱 비교
+## Word processor print preview
 
-960×1040 클라이언트 영역의 한글 2020에서 새 빈 문서에 기본 2×2 표를 삽입하고 창을 전경에 둔다. 미리보기 배율은 쪽 맞춤으로 둔다. VisionCache MCP의 `list_windows`로 이 테스트 문서의 핸들을 조회한다.
+In Hancom Hwp 2020, open a new unsaved document and insert a default 2×2 table. Keep the window in the foreground with a 960×1040 client area and set print preview to fit the page. Use the VisionCache MCP tool `list_windows` to obtain the test window's handle.
 
 ```powershell
-$windowHandle = [int](Read-Host '테스트 문서 창 핸들')
+$windowHandle = [int](Read-Host 'Test document window handle')
 python -m benchmarks.run_hwp --window $windowHandle --repeats 3 --no-cache
 ```
 
-실행기는 매 시도를 세로 설정으로 초기화한다. 편집 용지 대화상자를 연 뒤 모델이 가로 선택, 설정 적용, 인쇄 미리보기 열기, 페이지 수 및 표의 전체 테두리 판독을 수행한다. 모델의 클릭은 이 창의 정해진 세 컨트롤 영역에 들어왔을 때만 실행된다. DPI나 창 모양이 달라질 경우에 맞춰 좌표 영역을 별도로 검증해야 한다. 미리보기에서 끝나는 시나리오다. 화면 전환 직후에는 두 번 연속 같은 화면을 확인하고 모델을 호출한다.
+The runner resets the document to portrait before each trial. It opens the Edit Paper dialog and asks the agent to select landscape, apply it, open print preview, and report the page count and whether the full table border is visible. The runner permits clicks in the three control regions for this task. Recheck the regions if the DPI or window layout changes. After a screen transition, the runner waits for two matching observations before calling the model.
 
-두 모드 모두 본창 핸들로 시작해 연결된 전경 대화상자를 따라간다. `adaptive_delta`는 작은 대화상자를 원본으로 보내므로 이 비교에서 주로 미리보기와 편집 화면의 전송 비용이 달라진다. 측정 시간에 모델 호출 및 UI 처리 시간을 포함하며 시도 간 세로 설정 복원 시간은 제외한다. `--no-cache`를 빼면 API의 기본 암시적 프롬프트 캐시가 적용된다.
+Both modes start with the main window handle and follow its foreground dialog. Adaptive capture sends the selected dialog at native resolution. Most of the input savings in this test come from the edit and preview windows. Completion time includes model calls and UI processing. Timing begins after the reset to portrait. By default the runner requests implicit prompt caching. The command above uses explicit cache mode and the reported run recorded zero cache hits and writes.
 
-[한글 2020 실측 CSV](reference-hwp-2026-11-22.csv)에 화면 안정화 전 예비 결과와 안정화 후 결과가 있다. 안정화 후 캐시를 끈 비교에서 두 모드 모두 3/3 성공했다. 비용은 원본 `$0.009586` 대비 조건부 방식 `$0.006054`로 성공 1건당 36.8% 감소했다.
+The reference CSV includes the preliminary trials and the stabilized comparison. Token columns sum the API-reported usage across all attempts in each row. In the stabilized comparison each mode succeeded in 3/3 trials. Input usage fell from 12,564 to 7,266 tokens across the three runs, with 363 output tokens for each mode. [Hwp 2020 results](reference-hwp-2026-11-22.csv)

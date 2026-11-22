@@ -1,58 +1,64 @@
 # VisionCache
 
-VisionCache는 스크린샷으로 데스크톱 앱을 조작하는 에이전트용 로컬 MCP 서버다. 기본 모드는 선택한 창의 축소 화면을 보내고, 새로 나타난 작은 글씨나 붉은 경고 영역만 원본 크기로 추가한다. 모델이 고른 이미지 좌표를 실제 창의 입력 좌표로 변환한다.
+VisionCache는 Windows와 macOS를 대상으로 하는 독립 Rust MCP 서버다. 데스크톱 에이전트에 선택한 창의 축소 화면을 보내고, 작은 글씨나 붉은 경고가 새로 나타나면 해당 영역만 원본으로 보낸다. 같은 서버에서 좌표 변환, 클릭, 스크롤, 키 입력, 텍스트 입력을 할 수 있다.
 
-[English](README.md) · [macOS 설계](docs/macos-design.md) · [벤치마크 재현](benchmarks/README.md)
+[영문 메인 README](README.md) · [실측과 재현](benchmarks/README.md) · [macOS 설계](docs/macos-design.md)
 
-| 구성 | 현재 상태 |
-| --- | --- |
-| Windows 데스크톱 MCP | Windows 10/11 대상. Windows 10의 테스트 앱과 한글 2020에서 검증했다. |
-| Python 이미지 처리 | 다른 캡처 실행기에서 받은 Pillow 이미지를 입력으로 사용할 수 있다. |
-| macOS 데스크톱 MCP | macOS 14 이상을 대상으로 설계했다. 네이티브 구현과 실기기 검증은 다음 단계다. |
+## API 사용량 실측
 
-## 설치
+한글 2020에서 문서를 가로로 바꾸고 인쇄 미리보기의 페이지 수와 표 테두리를 확인했다. 조건부 캡처의 입력 토큰은 실행당 4,188개에서 2,422개로 **42.2% 감소**했고, 입력과 출력을 합친 토큰은 **41.0% 감소**했다. 두 방식 모두 3회 중 3회 성공했고, 캐시 적중과 쓰기는 0이었다. API 사용량에 당시 실험 단가를 적용한 성공 1건당 비용은 36.8% 줄었다. [영문 비교표](README.md#measured-api-usage) · [한글 2020 실측 CSV](benchmarks/reference-hwp-2026-11-22.csv)
 
-대화형 Windows 데스크톱과 Python 3.10 이상에서 실행한다.
+## 에이전트에게 설치 맡기기
+
+조작할 PC에서 Codex, Claude Code 또는 Gemini CLI의 로컬 세션을 열고, 아래 문장을 붙여넣는다.
+
+> https://raw.githubusercontent.com/HosooJeong/VisionCache/main/INSTALL.md 를 읽고, 이 PC에서 쓰는 에이전트에 VisionCache 설치부터 MCP 서버와 데스크톱 스킬 등록, 연결 확인까지 직접 해줘.
+
+터미널 명령은 에이전트가 실행한다. Windows x64에서는 npm 패키지를 사용하고, macOS에서는 소스에서 빌드한다. [설치 가이드](INSTALL.md)
+
+## 빌드와 연결
+
+대화형 Windows 데스크톱에서 Rust MSVC 툴체인으로 빌드한다.
 
 ```powershell
-git clone https://github.com/HosooJeong/VisionCache.git
-cd VisionCache
-python -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install -e ".[mcp]"
-& .\.venv\Scripts\visioncache-mcp.exe --help
+cargo build --locked --release
+.\target\release\visioncache-mcp.exe --help
 ```
 
-MCP 클라이언트에 가상환경의 `visioncache-mcp.exe` 절대 경로를 **stdio 서버**로 등록한다. 서버에는 API 키가 필요 없다. 반환된 이미지와 메타데이터의 모델 전송은 클라이언트에서 결정한다. [설정 예시](README.md#quick-start)
+MCP 클라이언트에서 `visioncache-mcp.exe`의 절대 경로를 실행 명령으로 등록한다. 실행 파일 자체에는 Python 런타임이나 모델 API 키가 필요 없다. [MCP 설정 예시](README.md#windows-quick-start)
 
-## 사용 흐름
+1. `list_windows`로 창 핸들을 조회한다.
+2. `observe_window`에 핸들을 넣는다. 결과는 JSON 메타데이터와 PNG 순서이며, 이미지 0은 창 전체를 보여준다.
+3. `observation_id`로 `click`, `scroll`, `fill`, `type_text`, `press_key`를 호출한다. 좌표는 선택한 이미지 기준이다.
+4. 입력이 끝나면 최신 화면을 다시 관찰한다. 동일한 본창 핸들을 사용하면 소유 관계가 확인된 전경 대화상자를 자동으로 따라간다.
 
-1. `list_windows`에서 대상 창을 선택한다.
-2. `observe_window`로 관찰한다. 이미지 0은 창 내부 전체이며, 이후 이미지는 변경 영역의 원본 크롭이다.
-3. `observation_id`와 해당 이미지 안의 좌표로 `click`, `scroll`, `fill`을 호출한다. 현재 포커스에는 `type_text`와 `press_key`를 사용할 수 있다.
-4. 입력 후에는 다시 관찰한다. 입력 대상은 전경 창이어야 하며, 창이 이동하거나 크기가 달라진 경우에는 좌표를 다시 확인한다.
+`adaptive_delta`는 기본 모드다. 화면이 읽기 어렵다면 `mode="full"`로 원본을 요청할 수 있다. 텍스트 크기와 색상이 감지에 영향을 준다. [모드와 좌표 상세](README.md#use-the-mcp-tools)
 
-본창 핸들을 계속 사용하면 같은 앱의 소유 관계가 확인된 전경 대화상자를 따라간다. 대화상자가 닫히면 다시 본창을 관찰한다. `requested_window`는 처음 요청한 창, `window`는 실제 캡처한 창이다. `follow_owned=false`를 지정하면 선택한 창을 직접 캡처한다.
+## Codex에 설치
 
-| 모드 | 전송 내용 |
-| --- | --- |
-| `full` | 원본 전체 화면 |
-| `resized` | 축소 전체 화면 |
-| `resized_delta` | 축소 전체 화면과 일반 변경 영역 |
-| `adaptive_delta` | 축소 전체 화면과 작은 글씨·붉은 경고의 변경 영역. 소유 대화상자는 원본 크기로 전송한다. |
+설치 명령을 한 번 실행하면 현재 사용자 설정에 VisionCache MCP와 데스크톱 자동 선택 스킬을 함께 등록한다.
 
-감지는 픽셀 크기와 색상에 의존하며 앱 테마와 글꼴 배율에 영향을 받는다. 세부 판독이 필요하면 `mode="full"`로 다시 관찰한다. [도구와 Python 연동](README.md#observe-and-interact)
+```powershell
+.\target\release\visioncache-mcp.exe --install-codex
+```
 
-## 검증 결과
+macOS에서는 `./target/release/visioncache-mcp --install-codex`를 실행한다. Codex CLI 경로를 직접 지정하려면 `--codex-cli`를 사용한다.
 
-한글 2020에서 가로 방향을 설정하고 인쇄 미리보기에서 1쪽과 표의 테두리를 확인했다. 화면 전환이 안정될 때까지 기다리고 API 프롬프트 캐시를 끈 조건에서 두 방식 모두 3회 전부 성공했다.
+새 로컬 Codex 채팅에서 Windows 또는 macOS 데스크톱 앱 조작을 요청하면 자동 선택 대상이 된다. 직접 선택하려면 `$visioncache-desktop`을 호출한다. 앱 설정의 **Computer use** 스위치는 내장 공급자를 제어하며, VisionCache는 등록된 외부 MCP로 연결된다. [Codex 스킬 안내](https://learn.chatgpt.com/docs/build-skills) · [내장 Computer Use](https://learn.chatgpt.com/docs/computer-use)
 
-| 방식 | 성공 1건당 비용 | 완료 시간 중앙값 |
-| --- | ---: | ---: |
-| 원본 전체 | $0.009586 | 7.56초 |
-| 조건부 차분 | $0.006054 | 7.44초 |
+## 구현과 검증
 
-조건부 차분의 API 비용은 이 작업에서 36.8% 낮았다. Windows 재고 입력 테스트에서는 네 가지 모드가 각각 8회 전부 성공했다. [한글 실측](benchmarks/reference-hwp-2026-11-22.csv) · [재고 입력 실측](benchmarks/reference-2026-11-22.csv) · [테스트 실행](README.md#development)
+Win32가 반환한 BGR 픽셀을 Rust 버퍼로 직접 받고, 연속 관찰에서는 두 버퍼를 교대로 사용한다. 차분·크롭 선택·리사이즈·PNG 인코딩·MCP 모두 Rust 실행 파일 안에서 동작한다.
 
-## 라이선스 상태
+`cargo test --locked`로 공통 코어를 검증한다. Windows에서 기존 통합 테스트의 `--server`에 Rust 바이너리 경로를 주면 시나리오를 실제 GUI로 확인할 수 있다. Python은 이전 구현과 테스트 도구로 남아 있다. 앞서 발표한 재고 입력과 한글 2020 API 실측은 Python 버전 기준이다. [검증 명령](README.md#validation) · [한글 2020 실측](benchmarks/reference-hwp-2026-11-22.csv)
 
-공개 저장소이며 라이선스 파일은 미지정 상태다. [GitHub 저장소 라이선스 안내](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository)
+## macOS
+
+macOS 14 이상을 대상으로 ScreenCaptureKit 창 캡처, Accessibility 대상 확인, Quartz 입력을 구현했다. Apple Silicon과 Intel 타깃의 교차 컴파일 검사를 통과했다. 실기기에서 권한, Retina 좌표, 창과 대화상자 동작을 검증해야 한다.
+
+```sh
+MACOSX_DEPLOYMENT_TARGET=14.0 cargo build --locked --release
+./target/release/visioncache-mcp --permissions
+```
+
+MCP에 빌드 결과의 절대 경로를 등록한다. 화면 기록 권한으로 캡처를, 손쉬운 사용 권한으로 입력을 검증한다. 관찰의 좌표 단위는 macOS에서 전역 화면 포인트다. 공개 저장소의 이용 라이선스는 미지정 상태다. [macOS 설계와 실기기 검증 순서](docs/macos-design.md)

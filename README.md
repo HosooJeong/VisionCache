@@ -1,104 +1,130 @@
 # VisionCache
 
-VisionCache is a local MCP server for desktop computer use. It gives an agent a low-resolution view of a selected window and adds native-resolution detail when a change includes small text or a red warning. It also maps image coordinates back to the window for mouse and keyboard input.
+VisionCache is a Rust MCP server for Windows and macOS desktop agents. It sends a scaled view of the selected window and adds native-resolution crops when changes include small text or red warnings. The same server can click, scroll, type, and follow the window's foreground dialogs.
 
-[한국어](README.ko.md) · [macOS design](docs/macos-design.md) · [Benchmarks](benchmarks/README.md)
+**42.2% fewer API input tokens in a desktop word-processing benchmark.** Adaptive capture used 2,422 input tokens per completed run, down from 4,188 with full-resolution capture. Both modes completed all three runs. [Measured results](#measured-api-usage)
+
+[Installation guide](INSTALL.md) · [Benchmarks](benchmarks/README.md) · [macOS design](docs/macos-design.md) · [한국어](README.ko.md)
+
+## Install with your agent
+
+Open a local Codex, Claude Code, or Gemini CLI session on the desktop you want to control. Copy this message into the chat.
+
+> Follow https://raw.githubusercontent.com/HosooJeong/VisionCache/main/INSTALL.md to install VisionCache for the agent I'm using on this computer, register its MCP server and desktop skill, and verify the connection.
+
+The agent can handle the terminal steps. The npm release is for Windows x64. On macOS, use the source build. [Installation guide](INSTALL.md)
+
+## Measured API usage
+
+In a Windows desktop word processor, the agent switched a document to landscape, opened print preview, and confirmed the page count and table borders. This live OpenAI Responses API test used `gpt-6.2-sol` and the Python reference implementation of VisionCache. Each trial took four API calls, with zero cached input or cache-write tokens in either mode.
+
+| Capture mode | Success | Input tokens per run | Total tokens per run | API cost per success | Median completion |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Full resolution | 3/3 | 4,188 | 4,309 | $0.009586 | 7.56 s |
+| Adaptive | 3/3 | 2,422 | 2,543 | $0.006054 | 7.44 s |
+
+Adaptive capture reduced **input tokens by 42.2%**, **total tokens by 41.0%**, and **usage-based API cost by 36.8%**. The token counts come from the API's reported usage. Total tokens include input and output. Costs apply the benchmark rates to that reported usage. [API usage CSV](benchmarks/reference-hwp-2026-11-22.csv) · [Test method](benchmarks/README.md#word-processor-print-preview)
+
+In a separate Windows stock-intake fixture, all four modes succeeded in 8/8 trials each. Adaptive capture reduced usage-based cost per success by **45.5%** from full resolution, with median completion moving from 12.41 s to 11.85 s. [Four-mode results CSV](benchmarks/reference-2026-11-22.csv)
+
+## Platform support
 
 | Component | Status |
 | --- | --- |
-| Windows desktop MCP | Implemented for Windows 10/11. Verified on Windows 10 with an isolated fixture and Hwp 2020. |
-| Python image policy | Accepts Pillow images from an existing capture pipeline. |
-| macOS desktop MCP | Design proposal for macOS 14 and later. Native capture and input are pending implementation and on-device verification. |
+| Rust runtime | Native Windows capture, adaptive observation, PNG encoding, and input over stdio MCP. |
+| Portable Rust core | BGR difference detection, crop selection, PNG encoding, and observation state. |
+| macOS 14+ | Native Rust ScreenCaptureKit, Accessibility, and Quartz backend. Cross-target checked on Apple Silicon and Intel. On-device verification is pending. |
+| Python reference | Earlier implementation and reproducible benchmark harness. |
 
-## Quick start
+## Windows quick start
 
-Run this from an interactive Windows desktop with Python 3.10 or later.
+Build on Windows with the Rust MSVC toolchain. Use an interactive Windows desktop for window capture and input.
 
 ```powershell
 git clone https://github.com/HosooJeong/VisionCache.git
 cd VisionCache
-python -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install -e ".[mcp]"
-& .\.venv\Scripts\visioncache-mcp.exe --help
+cargo build --locked --release
+.\target\release\visioncache-mcp.exe --help
 ```
 
-Add VisionCache as a local **stdio** server in your MCP client. Replace the example path with the absolute path to the executable in your virtual environment. For clients that use an `mcpServers` object, the configuration looks like this.
+Use the executable's absolute path to register a local **stdio** MCP server.
 
 ```json
 {
   "mcpServers": {
     "visioncache": {
-      "command": "C:\\path\\to\\VisionCache\\.venv\\Scripts\\visioncache-mcp.exe",
+      "command": "C:\\path\\to\\VisionCache\\target\\release\\visioncache-mcp.exe",
       "args": ["--scale", "0.5"]
     }
   }
 }
 ```
 
-The server uses no model API key. It returns PNGs and metadata to the connected client, which decides where to send them. Set the agent up to call VisionCache for desktop observation and input.
+The Windows executable needs an interactive session. VisionCache uses no Python runtime or model API credential. The connected client decides where the returned PNGs and metadata go.
 
-## Observe and interact
+## macOS build
 
-1. Call `list_windows` and select a window handle.
-2. Call `observe_window(window=<handle>)`. The response contains JSON metadata followed by PNG images. Image `0` is the full client area, at the requested mode's resolution. Additional PNGs are crops. `images[].source_box` gives each image's bounds in original capture pixels.
-3. Use `observation_id` and coordinates relative to the chosen image for `click`, `scroll`, or `fill`. Use `type_text` or `press_key` for the current focus. `map_point` returns Windows screen pixels for an external input adapter.
-4. Take a new observation after an input. Input requires the observed window to be in the foreground. Layout changes can invalidate previously observed coordinates.
+On macOS 14 or later with Rust and Xcode Command Line Tools installed:
 
-Keep requesting the original handle when the app opens an owned foreground dialog. VisionCache shows the dialog, then returns to the main window when it closes. The response distinguishes `requested_window` from the captured `window`. Pass `follow_owned=false` to capture the requested window directly.
+```sh
+MACOSX_DEPLOYMENT_TARGET=14.0 cargo build --locked --release
+./target/release/visioncache-mcp --permissions
+```
+
+Use the absolute path to the binary in an MCP stdio configuration. Enable Screen Recording and Accessibility for the host as applicable. Apple Silicon and Intel cross-target checks pass. The actual permissions, image geometry, and input need testing on a Mac. [macOS setup and smoke test](docs/macos-design.md)
+
+## Install for Codex
+
+From the built executable, one command installs the local MCP server and an implicitly discoverable desktop skill in the current user's Codex setup:
+
+```powershell
+.\target\release\visioncache-mcp.exe --install-codex
+```
+
+On macOS, use `./target/release/visioncache-mcp --install-codex`. If Codex is outside PATH, pass its executable with `--codex-cli`. For a different overview size, pass `--scale` to the installer.
+
+Open a new **local** Codex chat. On a request to operate a Windows or macOS desktop application, Codex can select the VisionCache skill and use the registered MCP tools. You can explicitly invoke `$visioncache-desktop` to choose this route. Installation uses Codex's external MCP and skill interfaces. The app's built-in **Settings → Computer use** switch controls the bundled provider separately. [MCP setup](https://learn.chatgpt.com/docs/mcp) · [Skill invocation](https://learn.chatgpt.com/docs/build-skills) · [Built-in Computer Use](https://learn.chatgpt.com/docs/computer-use)
+
+## Use the MCP tools
+
+1. Call `list_windows`, then pass a returned handle to `observe_window`.
+2. The response contains JSON metadata followed by PNGs. Image `0` shows the whole client area. Any following image is a native-resolution crop. Use `images[].source_box` for its bounds in capture pixels.
+3. Use the newest `observation_id` and image-local coordinates for `click`, `scroll`, or `fill`. Use `type_text` or `press_key` for the current keyboard focus. `map_point` converts the image-local coordinates to the coordinate space in the observation. Windows uses screen pixels and macOS uses screen points.
+4. Observe again after each input. The target must be in the foreground, the point must be visible, and the window placement must match the observation.
+
+Keep requesting the same application handle to follow its owned foreground dialog and return after it closes. `requested_window` is the original handle, and `window` describes the actual captured surface. Set `follow_owned=false` to capture exactly the requested window.
 
 | Mode | Images returned |
 | --- | --- |
-| `full` | The current surface at native resolution |
-| `resized` | A scaled view of the current surface |
-| `resized_delta` | A scaled view plus a bounded crop from the changed area |
-| `adaptive_delta` | A scaled view plus a native crop for newly changed small text or red warning text. An owned foreground dialog is captured at native resolution. |
+| `full` | The window's native-resolution client capture |
+| `resized` | A scaled overview |
+| `resized_delta` | A scaled overview and a bounded crop of changed pixels |
+| `adaptive_delta` | A scaled overview and a bounded native crop for newly changed small text or red warnings. Owned foreground dialogs are returned at native resolution. |
 
-The default uses pixel heuristics for character height and red warning text. Fonts, themes, and display scaling affect detection. Request `mode="full"` for a detailed refresh. GPU-rendered windows, separate system dialogs, and elevated apps can have capture or input restrictions.
+Crop eligibility depends on pixel height and color. Use `mode="full"` for on-demand detail. Some hardware-accelerated, elevated, and system windows have capture or input restrictions. On macOS, input also requires an accessible foreground window and a reliable hit target.
 
-## Use the image policy in Python
+## Native data path
 
-Install the base package with `python -m pip install -e .` and pass the current and previous captures as Pillow images. Pass `None` as the previous capture on the first observation.
+The Windows adapter captures the selected client area through GDI and writes top-down BGR scanlines into a Rust buffer. The session swaps two reusable buffers between observations and compares the capture bytes directly. The macOS adapter converts a ScreenCaptureKit image into the same BGR format. The shared output stage resizes the overview and converts colors as it encodes PNG. It retains the captured surface and its placement separately from the image pixels.
 
-```python
-from PIL import Image
-from visioncache import observe
-
-with Image.open("current.png") as current, Image.open("previous.png") as previous:
-    frames = observe("adaptive_delta", current, previous, scale=0.5)
-    for frame in frames:
-        print(frame.image.size, frame.box, frame.reason)
-```
-
-## Measured results
-
-Both experiments used `gpt-6.2-sol`. Costs use API-reported usage and the Standard rate card. The comparison is scoped to the tasks below.
-
-| Task and mode | Success | USD per success | Median completion |
-| --- | ---: | ---: | ---: |
-| Windows stock intake and error recovery, full | 8/8 | $0.017472 | 12.41 s |
-| Windows stock intake and error recovery, resized + general delta | 8/8 | $0.009810 | 11.69 s |
-| Windows stock intake and error recovery, adaptive delta | 8/8 | $0.009526 | 11.85 s |
-| Hwp 2020 print-preview verification, full | 3/3 | $0.009586 | 7.56 s |
-| Hwp 2020 print-preview verification, adaptive delta | 3/3 | $0.006054 | 7.44 s |
-
-The Hwp comparison used a disposable 2×2 table, waited for the window to settle after each transition, and disabled API prompt caching. Both modes used four model calls per successful trial. Adaptive mode reduced API cost by **36.8%** in that run while preserving the dialog at native resolution.
-
-[Stock intake results](benchmarks/reference-2026-11-22.csv) · [Hwp results, including preliminary runs](benchmarks/reference-hwp-2026-11-22.csv) · [Reproduction](benchmarks/README.md)
-
-## Development
+## Validation
 
 ```powershell
-& .\.venv\Scripts\python.exe -m pip install -e ".[test]"
-& .\.venv\Scripts\python.exe -m pytest -q
-& .\.venv\Scripts\python.exe -m tests.windows_mcp_smoke
-& .\.venv\Scripts\python.exe -m benchmarks.run --smoke
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
 ```
 
-Keep the test window in the foreground during the Windows MCP smoke test. The API benchmarks require credentials. The unit tests and stock-intake smoke test run offline.
+The native app smoke test creates a disposable Windows GUI and uses a separate MCP client to drive the Rust executable. Python is used by this test harness.
+
+```powershell
+python -m venv .venv
+& .\.venv\Scripts\python.exe -m pip install -e ".[test]"
+& .\.venv\Scripts\python.exe -m tests.windows_mcp_smoke --server .\target\release\visioncache-mcp.exe
+```
 
 ## Related work
 
-DeltaVision and DeltaVision-OS explore changed-region observations for browser and desktop agents. VisionCache focuses on selected-window MCP control, including owned dialogs, and applies a separate rule for when a native crop is useful. The benchmarks above use VisionCache's own comparison modes. [DeltaVision](https://github.com/ddavidgao/deltavision) · [DeltaVision-OS](https://github.com/ddavidgao/deltavision-os)
+DeltaVision and DeltaVision-OS explore changed-region observations for browsers and desktop agents. VisionCache combines selected-window MCP control, owned-dialog tracking, and a separate rule for when to send a native crop. [DeltaVision](https://github.com/ddavidgao/deltavision) · [DeltaVision-OS](https://github.com/ddavidgao/deltavision-os)
 
 ## License status
 
