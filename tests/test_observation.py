@@ -107,3 +107,61 @@ def test_failed_capture_invalidates_current_observation():
         session.capture(1)
     with pytest.raises(DesktopError, match="stale"):
         session.map_point(observation.id, 0, 0, 0)
+
+
+@pytest.mark.parametrize(("foreground", "follow_owned", "expected"), [
+    (22, True, 22),   # Nested foreground popup of the target.
+    (22, False, 10),  # Exact-window capture stays available.
+    (23, True, 10),   # Unrelated window from the same process.
+    (24, True, 10),   # Other process is excluded even with an owner link.
+    (25, True, 10),   # The observed foreground disappeared.
+    (None, True, 10),
+])
+def test_windows_capture_follows_only_owned_foreground(foreground, follow_owned, expected):
+    from types import SimpleNamespace
+    from visioncache.windows import WindowsDesktop
+
+    backend = object.__new__(WindowsDesktop)
+    owners = {21: 10, 22: 21, 24: 10}
+    backend._user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: foreground,
+        GetWindow=lambda window, _relationship: owners.get(window),
+    )
+
+    def read_window(handle):
+        if handle == 25:
+            raise DesktopError("The window closed.")
+        return Window(handle, 8 if handle == 24 else 7, 1, f"Window {handle}")
+
+    backend._window = read_window
+    assert backend._capture_target(10, follow_owned) == expected
+
+
+def test_adaptive_session_keeps_owned_dialog_native_and_restores_overview():
+    desktop = FakeDesktop()
+    base = desktop.state
+    dialog = WindowState(Window(2, 10, 20, "Dialog"), (0, 0, 600, 400))
+    selected = base
+
+    def capture(handle, *, follow_owned=False):
+        assert handle == base.window.handle
+        return (selected if follow_owned else base), desktop.image.copy()
+
+    desktop.capture = capture
+    session = WindowSession(desktop)
+    first = session.capture(1, follow_owned=True)
+    assert first.frames[0].image.size == (300, 200)
+
+    selected = dialog
+    popup = session.capture(1, follow_owned=True)
+    assert popup.effective_mode == "full"
+    assert popup.frames[0].image.size == (600, 400)
+    assert session.map_point(popup.id, 0, 150, 100) == (150, 100)
+    with pytest.raises(DesktopError, match="stale"):
+        session.map_point(first.id, 0, 0, 0)
+
+    selected = base
+    back = session.capture(1, follow_owned=True)
+    assert back.state == base
+    assert back.effective_mode == "adaptive_delta"
+    assert [frame.image.size for frame in back.frames] == [(300, 200)]

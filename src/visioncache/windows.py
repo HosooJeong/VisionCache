@@ -10,6 +10,7 @@ from PIL import ImageGrab
 from .session import DesktopError, Window, WindowState
 
 GA_ROOT = 2
+GW_OWNER = 4
 PM_AWARE_V2 = ctypes.c_void_p(-4)
 ULONG_PTR = ctypes.c_size_t
 INPUT_MOUSE, INPUT_KEYBOARD = 0, 1
@@ -21,6 +22,7 @@ KEYS = {
     "pageup": 0x21, "pagedown": 0x22, "end": 0x23, "home": 0x24,
     "left": 0x25, "up": 0x26, "right": 0x27, "down": 0x28, "delete": 0x2E,
 }
+KEYS.update({f"f{number}": 0x6F + number for number in range(1, 13)})
 MODIFIERS = {"shift": 0x10, "ctrl": 0x11, "alt": 0x12}
 
 
@@ -87,6 +89,7 @@ class WindowsDesktop:
             ("IsWindowVisible", w.BOOL, w.HWND),
             ("IsIconic", w.BOOL, w.HWND),
             ("GetForegroundWindow", w.HWND),
+            ("GetWindow", w.HWND, w.HWND, w.UINT),
             ("WindowFromPoint", w.HWND, w.POINT),
             ("SetCursorPos", w.BOOL, ctypes.c_int, ctypes.c_int),
             ("SetThreadDpiAwarenessContext", ctypes.c_void_p, ctypes.c_void_p),
@@ -154,15 +157,43 @@ class WindowsDesktop:
         x, y = origin.x, origin.y
         return WindowState(window, (x, y, x + client.right, y + client.bottom))
 
-    def capture(self, handle: int):
+    def _capture_target(self, handle: int, follow_owned: bool) -> int:
+        if not follow_owned:
+            return handle
+        root = self._window(handle)
+        foreground = self._user32.GetForegroundWindow()
+        if not foreground or foreground == handle:
+            return handle
+        try:
+            candidate = self._window(foreground)
+        except DesktopError:
+            return handle
+        if candidate.process_id != root.process_id:
+            return handle
+
+        # Some Hwp dialogs report themselves as GA_ROOTOWNER despite an explicit
+        # GW_OWNER link. Walk that link and exclude unrelated windows of the app.
+        owner = foreground
+        visited = set()
+        while owner and owner not in visited:
+            if owner == handle:
+                return foreground
+            visited.add(owner)
+            owner = self._user32.GetWindow(owner, GW_OWNER)
+        return handle
+
+    def capture(self, handle: int, *, follow_owned: bool = False):
         with self._physical_pixels():
-            state = self._state(handle)
+            actual = self._capture_target(handle, follow_owned)
+            state = self._state(actual)
             try:
-                image = ImageGrab.grab(window=handle)
+                image = ImageGrab.grab(window=actual)
             except OSError as error:
                 raise DesktopError(f"Windows could not capture the selected window: {error}") from error
 
-            if self._state(handle).placement != state.placement:
+            if self._capture_target(handle, follow_owned) != actual:
+                raise DesktopError("The active window changed during capture. Capture it again.")
+            if self._state(actual).placement != state.placement:
                 raise DesktopError("The window moved or resized during capture. Capture it again.")
             left, top, right, bottom = state.bounds
             # Pillow's HWND capture is the client area. DPI-virtualized windows

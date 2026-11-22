@@ -1,4 +1,4 @@
-"""Compare three screenshot policies on an isolated Windows stock-intake fixture."""
+"""Compare four screenshot policies on an isolated Windows stock-intake fixture."""
 
 import argparse
 import base64
@@ -73,8 +73,9 @@ def encode_frame(frame):
     return {"type": "input_image", "image_url": f"data:image/png;base64,{data}", "detail": "high"}
 
 
-def call_api(key, model, frames, task, previous_action, timeout):
-    content = [{"type": "input_text", "text": f"Task: {task.instruction}\n{previous_action}"}]
+def call_api(key, model, frames, instruction, previous_action, timeout, *,
+             instructions=INSTRUCTIONS, cache_mode="implicit"):
+    content = [{"type": "input_text", "text": f"Task: {instruction}\n{previous_action}"}]
     for index, frame in enumerate(frames):
         width, height = frame.image.size
         content.append({
@@ -85,12 +86,12 @@ def call_api(key, model, frames, task, previous_action, timeout):
 
     payload = {
         "model": model,
-        "instructions": INSTRUCTIONS,
+        "instructions": instructions,
         "input": [{"role": "user", "content": content}],
         "text": {"format": ACTION_FORMAT},
         "reasoning": {"effort": "low"},
         "service_tier": "default",
-        "prompt_cache_options": {"mode": "implicit", "ttl": "30m"},
+        "prompt_cache_options": {"mode": cache_mode, "ttl": "30m"},
         "max_output_tokens": 512,
         "store": False,
     }
@@ -231,7 +232,7 @@ def run_trial(fixture, pool, args, rates, api_key, scenario, repetition, mode, t
                 calls += 1
                 api_start = time.perf_counter()
                 future = pool.submit(call_api, api_key, args.model, frames,
-                                     task, previous_action, args.timeout)
+                                     task.instruction, previous_action, args.timeout)
                 try:
                     response = wait_for_api(future, fixture)
                 except (ApiError, FixtureClosed):

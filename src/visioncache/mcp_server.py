@@ -27,6 +27,7 @@ def create_server(session: WindowSession):
         log_level="WARNING",
         instructions=(
             "List windows and observe the chosen window before input. "
+            "Keep requesting the original window handle to follow and exit its foreground dialogs. "
             "Use the supplied observation_id and image-local pixel coordinates. "
             "Image 0 is the whole client area. Later images are native-resolution crops. "
             "Observe again after each action. Request mode='full' for unreadable text "
@@ -44,17 +45,20 @@ def create_server(session: WindowSession):
             raise ToolError(str(error)) from error
 
     @server.tool(annotations=read_only, structured_output=False)
-    def observe_window(window: int, mode: Mode = "adaptive_delta") -> list[TextContent | ImageContent]:
-        """Capture a window. Return JSON metadata followed by PNG images in image-index order."""
+    def observe_window(window: int, mode: Mode = "adaptive_delta",
+                       follow_owned: bool = True) -> list[TextContent | ImageContent]:
+        """Capture a window or its foreground owned dialog. Return JSON metadata followed by PNGs."""
         try:
-            observation = session.capture(window, mode)
+            observation = session.capture(window, mode, follow_owned=follow_owned)
         except (DesktopError, ValueError) as error:
             raise ToolError(str(error)) from error
         metadata = {
             "observation_id": observation.id,
+            "requested_window": window,
             "window": asdict(observation.state.window),
             "window_bounds": observation.state.bounds,
             "mode": mode,
+            "effective_mode": observation.effective_mode,
             "images": [
                 {
                     "index": index, "size": frame.image.size, "source_box": frame.box,

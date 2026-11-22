@@ -5,6 +5,7 @@ import base64
 from io import BytesIO
 import json
 import sys
+import tkinter as tk
 
 import anyio
 from mcp import ClientSession, StdioServerParameters
@@ -48,8 +49,10 @@ async def check():
                     windows = (await call("list_windows")).structuredContent["result"]
                     window = next(item["handle"] for item in windows if item["title"] == fixture.root.title())
 
-                    async def view(mode="adaptive_delta"):
-                        result = await call("observe_window", {"window": window, "mode": mode})
+                    async def view(mode="adaptive_delta", *, follow_owned=True):
+                        result = await call("observe_window", {
+                            "window": window, "mode": mode, "follow_owned": follow_owned,
+                        })
                         data = json.loads(result.content[0].text)
                         images = [
                             Image.open(BytesIO(base64.b64decode(item.data)))
@@ -115,6 +118,24 @@ async def check():
                     await call("scroll", {"observation_id": context["observation_id"],
                                           "image": 0, "x": 80, "y": 175, "ticks": -1})
                     context, _ = await view()
+                    modal = tk.Toplevel(fixture.root)
+                    modal.title("VisionCache owned dialog")
+                    modal.transient(fixture.root)
+                    modal.geometry("360x240+150+160")
+                    tk.Label(modal, text="Local owned-dialog fixture").pack()
+                    modal.update()
+                    modal.focus_force()
+                    await asyncio.sleep(0.08)
+                    owned, images = await view()
+                    assert owned["requested_window"] == window
+                    assert owned["window"]["title"] == "VisionCache owned dialog"
+                    assert owned["effective_mode"] == "full" and images[0].size == (360, 240)
+                    exact, _ = await view(follow_owned=False)
+                    assert exact["window"]["handle"] == window
+                    modal.destroy()
+                    fixture.root.focus_force()
+                    context, _ = await view()
+                    assert context["window"]["handle"] == window
                     fixture.root.geometry("+100+120")
                     fixture.update()
                     invalid = await client.call_tool("click", {"observation_id": context["observation_id"],

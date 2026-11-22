@@ -36,7 +36,7 @@ class WindowState:
 
 class Desktop(Protocol):
     def windows(self) -> list[Window]: ...
-    def capture(self, handle: int) -> tuple[WindowState, Image.Image]: ...
+    def capture(self, handle: int, *, follow_owned: bool = False) -> tuple[WindowState, Image.Image]: ...
     def click(self, state: WindowState, x: int, y: int) -> None: ...
     def scroll(self, state: WindowState, x: int, y: int, ticks: int) -> None: ...
     def fill(self, state: WindowState, x: int, y: int, text: str, replace: bool) -> None: ...
@@ -49,6 +49,7 @@ class Observation:
     id: str
     state: WindowState
     mode: Mode
+    effective_mode: Mode
     frames: tuple[Frame, ...]
 
     def screen_point(self, image: int, x: int, y: int) -> tuple[int, int]:
@@ -79,18 +80,20 @@ class WindowSession:
         with self._lock:
             return self.desktop.windows()
 
-    def capture(self, handle: int, mode: Mode = "adaptive_delta") -> Observation:
+    def capture(self, handle: int, mode: Mode = "adaptive_delta",
+                *, follow_owned: bool = False) -> Observation:
         with self._lock:
             # A failed capture should never leave a stale observation actionable.
             self._latest = None
-            state, current = self.desktop.capture(handle)
+            state, current = self.desktop.capture(handle, follow_owned=True) if follow_owned else self.desktop.capture(handle)
             previous = None
             if self._previous and self._previous[0].placement == state.placement:
                 previous = self._previous[1]
-            frames = tuple(observe(mode, current, previous, self.scale))
+            effective_mode = "full" if mode == "adaptive_delta" and state.window.handle != handle else mode
+            frames = tuple(observe(effective_mode, current, previous, self.scale))
             # In full mode callers receive the unscaled image. Keep our cache independent.
-            self._previous = (state, current.copy() if mode == "full" else current)
-            self._latest = Observation(uuid4().hex, state, mode, frames)
+            self._previous = (state, current.copy() if effective_mode == "full" else current)
+            self._latest = Observation(uuid4().hex, state, mode, effective_mode, frames)
             return self._latest
 
     def _current(self, observation_id: str) -> Observation:
