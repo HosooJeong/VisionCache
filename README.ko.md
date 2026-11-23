@@ -4,19 +4,33 @@ VisionCache는 Windows와 macOS를 대상으로 하는 독립 Rust MCP 서버다
 
 [영문 메인 README](README.md) · [실측과 재현](benchmarks/README.md) · [macOS 설계](docs/macos-design.md)
 
-## API 사용량 실측
+## npm으로 Windows에 설치
 
-한글 2020에서 문서를 가로로 바꾸고 인쇄 미리보기의 페이지 수와 표 테두리를 확인했다. 조건부 캡처의 입력 토큰은 실행당 4,188개에서 2,422개로 **42.2% 감소**했고, 입력과 출력을 합친 토큰은 **41.0% 감소**했다. 두 방식 모두 3회 중 3회 성공했고, 캐시 적중과 쓰기는 0이었다. API 사용량에 당시 실험 단가를 적용한 성공 1건당 비용은 36.8% 줄었다. [영문 비교표](README.md#measured-api-usage) · [한글 2020 실측 CSV](benchmarks/reference-hwp-2026-11-22.csv)
+Windows x64에서 Node.js 18 이상을 설치한 뒤 PowerShell에서 실행한다. npm 패키지에 VisionCache 실행 파일이 들어 있다. [npm 패키지](https://www.npmjs.com/package/visioncache)
 
-## 에이전트에게 설치 맡기기
+```powershell
+npm.cmd install --global visioncache
+```
+
+Codex에 MCP 서버와 데스크톱 스킬을 등록하려면 아래 명령을 실행하고 새 로컬 Codex 채팅을 연다.
+
+```powershell
+visioncache.cmd --install-codex
+```
+
+Claude Code나 Gemini CLI를 쓰면 아래 문장으로 설치를 맡기거나 [설치 가이드](INSTALL.md)를 따르면 된다. macOS에서는 [소스에서 빌드](#macos)한다.
+
+### 에이전트에게 설치 맡기기
 
 조작할 PC에서 Codex, Claude Code 또는 Gemini CLI의 로컬 세션을 열고, 아래 문장을 붙여넣는다.
 
 > https://raw.githubusercontent.com/HosooJeong/VisionCache/main/INSTALL.md 를 읽고, 이 PC에서 쓰는 에이전트에 VisionCache 설치부터 MCP 서버와 데스크톱 스킬 등록, 연결 확인까지 직접 해줘.
 
-터미널 명령은 에이전트가 실행한다. Windows x64에서는 npm 패키지를 사용하고, macOS에서는 소스에서 빌드한다. [설치 가이드](INSTALL.md)
+## API 사용량 실측
 
-## 빌드와 연결
+한글 2020에서 문서를 가로로 바꾸고 인쇄 미리보기의 페이지 수와 표 테두리를 확인했다. 조건부 캡처의 입력 토큰은 실행당 4,188개에서 2,422개로 **42.2% 감소**했고, 입력과 출력을 합친 토큰은 **41.0% 감소**했다. 두 방식 모두 3회 중 3회 성공했고, 캐시 적중과 쓰기는 0이었다. API 사용량에 당시 실험 단가를 적용한 성공 1건당 비용은 36.8% 줄었다. [영문 비교표](README.md#measured-api-usage) · [한글 2020 실측 CSV](benchmarks/reference-hwp-2026-11-22.csv)
+
+## Windows에서 소스 빌드
 
 대화형 Windows 데스크톱에서 Rust MSVC 툴체인으로 빌드한다.
 
@@ -25,7 +39,7 @@ cargo build --locked --release
 .\target\release\visioncache-mcp.exe --help
 ```
 
-MCP 클라이언트에서 `visioncache-mcp.exe`의 절대 경로를 실행 명령으로 등록한다. 실행 파일 자체에는 Python 런타임이나 모델 API 키가 필요 없다. [MCP 설정 예시](README.md#windows-quick-start)
+MCP 클라이언트에서 `visioncache-mcp.exe`의 절대 경로를 실행 명령으로 등록한다. 실행 파일 자체에는 Python 런타임이나 모델 API 키가 필요 없다. [MCP 설정 예시](README.md#build-from-source-on-windows)
 
 1. `list_windows`로 창 핸들을 조회한다.
 2. `observe_window`에 핸들을 넣는다. 결과는 JSON 메타데이터와 PNG 순서이며, 이미지 0은 창 전체를 보여준다.
@@ -34,7 +48,7 @@ MCP 클라이언트에서 `visioncache-mcp.exe`의 절대 경로를 실행 명�
 
 `adaptive_delta`는 기본 모드다. 화면이 읽기 어렵다면 `mode="full"`로 원본을 요청할 수 있다. 텍스트 크기와 색상이 감지에 영향을 준다. [모드와 좌표 상세](README.md#use-the-mcp-tools)
 
-## Codex에 설치
+## 소스 빌드로 Codex에 등록
 
 설치 명령을 한 번 실행하면 현재 사용자 설정에 VisionCache MCP와 데스크톱 자동 선택 스킬을 함께 등록한다.
 

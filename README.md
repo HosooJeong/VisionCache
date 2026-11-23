@@ -6,13 +6,27 @@ VisionCache is a Rust MCP server for Windows and macOS desktop agents. It sends 
 
 [Installation guide](INSTALL.md) · [Benchmarks](benchmarks/README.md) · [macOS design](docs/macos-design.md) · [한국어](README.ko.md)
 
-## Install with your agent
+## Install on Windows with npm
 
-Open a local Codex, Claude Code, or Gemini CLI session on the desktop you want to control. Copy this message into the chat.
+On Windows x64 with Node.js 18 or later, install from PowerShell. The package includes the native VisionCache executable. [npm package](https://www.npmjs.com/package/visioncache)
+
+```powershell
+npm.cmd install --global visioncache
+```
+
+To register the MCP server and desktop skill in Codex, run the following command and then open a new local Codex chat.
+
+```powershell
+visioncache.cmd --install-codex
+```
+
+For Claude Code and Gemini CLI, let your agent follow the message below or use the [installation guide](INSTALL.md). On macOS, [build from source](#macos-build).
+
+### Install with your agent
+
+Open a local Codex, Claude Code, or Gemini CLI session on the desktop you want to control and paste this message.
 
 > Follow https://raw.githubusercontent.com/HosooJeong/VisionCache/main/INSTALL.md to install VisionCache for the agent I'm using on this computer, register its MCP server and desktop skill, and verify the connection.
-
-The agent can handle the terminal steps. The npm release is for Windows x64. On macOS, use the source build. [Installation guide](INSTALL.md)
 
 ## Measured API usage
 
@@ -36,7 +50,7 @@ In a separate Windows stock-intake fixture, all four modes succeeded in 8/8 tria
 | macOS 14+ | Native Rust ScreenCaptureKit, Accessibility, and Quartz backend. Cross-target checked on Apple Silicon and Intel. On-device verification is pending. |
 | Python reference | Earlier implementation and reproducible benchmark harness. |
 
-## Windows quick start
+## Build from source on Windows
 
 Build on Windows with the Rust MSVC toolchain. Use an interactive Windows desktop for window capture and input.
 
@@ -73,7 +87,7 @@ MACOSX_DEPLOYMENT_TARGET=14.0 cargo build --locked --release
 
 Use the absolute path to the binary in an MCP stdio configuration. Enable Screen Recording and Accessibility for the host as applicable. Apple Silicon and Intel cross-target checks pass. The actual permissions, image geometry, and input need testing on a Mac. [macOS setup and smoke test](docs/macos-design.md)
 
-## Install for Codex
+## Register a source build in Codex
 
 From the built executable, one command installs the local MCP server and an implicitly discoverable desktop skill in the current user's Codex setup:
 
