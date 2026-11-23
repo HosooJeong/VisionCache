@@ -1,8 +1,10 @@
 # VisionCache
 
-VisionCache is a Rust MCP server for Windows and macOS desktop agents. It sends a scaled view of the selected window and adds native-resolution crops when changes include small text or red warnings. The same server can click, scroll, type, and follow the window's foreground dialogs.
+**Desktop computer use for AI agents, with fewer input tokens.**
 
-**42.2% fewer API input tokens in a desktop word-processing benchmark.** Adaptive capture used 2,422 input tokens per completed run, down from 4,188 with full-resolution capture. Both modes completed all three runs. [Measured results](#measured-api-usage)
+**42.2% fewer API input tokens** in a live Windows word-processing benchmark. Adaptive capture cut input from 4,188 to 2,422 tokens per run. Both modes completed all three runs. [Measured results](#measured-api-usage)
+
+VisionCache lets AI agents see and control desktop apps through MCP. Its Rust server sends a scaled view of the selected window and adds native-resolution detail when small text or warnings appear. Agents can click, scroll, type, and follow foreground dialogs on Windows and macOS.
 
 [Installation guide](INSTALL.md) · [Benchmarks](benchmarks/README.md) · [macOS design](docs/macos-design.md) · [한국어](README.ko.md)
 
