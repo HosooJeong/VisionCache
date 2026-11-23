@@ -157,6 +157,6 @@ python -m venv .venv
 
 [DeltaVision](https://github.com/ddavidgao/deltavision) and [DeltaVision-OS](https://github.com/ddavidgao/deltavision-os) explore changed-region observations for browser and desktop agents.
 
-## License status
+## License
 
-A software license has yet to be specified for this repository. [GitHub's guide to repository licensing](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository)
+VisionCache is released under the MIT License. [License text](LICENSE)

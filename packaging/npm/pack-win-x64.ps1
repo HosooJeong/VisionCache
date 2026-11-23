@@ -50,6 +50,7 @@ foreach ($file in @('package.json', 'cli.cjs', 'README.md')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $staging $file)
 }
 Copy-Item -LiteralPath (Join-Path $repo 'INSTALL.md') -Destination (Join-Path $staging 'INSTALL.md')
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination (Join-Path $staging 'LICENSE')
 Copy-Item -LiteralPath (Join-Path $repo 'integrations/codex/visioncache-desktop/SKILL.md') -Destination (Join-Path $staging 'skill/SKILL.md')
 Copy-Item -LiteralPath $binary -Destination (Join-Path $staging 'native/visioncache-mcp.exe')
 $licenseDirectory = Join-Path $staging 'licenses'

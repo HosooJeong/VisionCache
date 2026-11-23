@@ -31,4 +31,6 @@ npm.cmd exec --offline --yes --package .\dist\npm\visioncache-0.2.1.tgz -- visio
 
 The pack command puts the archive under `dist/npm`. The launcher forwards CLI arguments and standard streams to the native executable. Use `--install-codex` instead of `--version` to register VisionCache and its desktop skill in the current user's Codex configuration.
 
-Dependency and Rust standard library notices are included in the `licenses` directory.
+## License
+
+VisionCache is released under the MIT License. Dependency and Rust standard library notices are included in the `licenses` directory. [License text](LICENSE)

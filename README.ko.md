@@ -71,4 +71,4 @@ MACOSX_DEPLOYMENT_TARGET=14.0 cargo build --locked --release
 
 ## 라이선스
 
-이 저장소의 소프트웨어 라이선스는 미지정 상태다. [영문 라이선스 안내](README.md#license-status)
+VisionCache는 MIT 라이선스로 공개한다. [라이선스 전문](LICENSE)

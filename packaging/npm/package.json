@@ -2,6 +2,7 @@
   "name": "visioncache",
   "version": "0.2.1",
   "description": "Window-scoped desktop computer use for AI agents over MCP",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/HosooJeong/VisionCache.git"

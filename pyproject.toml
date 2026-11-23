@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "visioncache"
 version = "0.1.0"
 description = "Adaptive screenshot observations for Windows computer-use agents"
+license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["Pillow>=11.2.1,<14"]

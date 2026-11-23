@@ -3,6 +3,7 @@ name = "visioncache"
 version = "0.2.1"
 edition = "2024"
 description = "Window-scoped desktop observation and input over MCP"
+license = "MIT"
 
 [[bin]]
 name = "visioncache-mcp"
