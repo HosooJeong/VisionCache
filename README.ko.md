@@ -6,7 +6,7 @@ VisionCache는 Windows와 macOS에서 AI 에이전트가 MCP로 데스크톱 앱
 
 Windows 문서 편집기 실측에서 **API 입력 토큰이 42.2% 줄었다.** 실행당 **4,188개에서 2,422개**로 줄었고, 두 방식 모두 3회 중 3회 성공했다. [실측 결과](#api-사용량-실측)
 
-[적용 전후](#동작-방식) · [빠른 시작](#빠른-시작) · [영문 README](README.md) · [npm](https://www.npmjs.com/package/visioncache) · [실험 재현](benchmarks/README.md)
+[적용 전후](#동작-방식) · [빠른 시작](#빠른-시작) · [영문 README](README.md) · [简体中文](README.zh-CN.md) · [npm](https://www.npmjs.com/package/visioncache) · [실험 재현](benchmarks/README.md)
 
 ## 동작 방식
 

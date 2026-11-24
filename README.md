@@ -6,7 +6,7 @@ VisionCache is a local MCP server for Windows and macOS. It gives agents a scale
 
 **42.2% fewer API input tokens** in a live Windows word-processing benchmark. Input fell from **4,188 to 2,422 tokens per run**, and both capture modes completed all three trials. [See the benchmark](#measured-api-usage)
 
-[Before and after](#how-it-works) · [Quickstart](#quickstart) · [npm](https://www.npmjs.com/package/visioncache) · [Benchmarks](#measured-api-usage) · [MCP tools](#use-the-mcp-tools) · [한국어](README.ko.md)
+[Before and after](#how-it-works) · [Quickstart](#quickstart) · [npm](https://www.npmjs.com/package/visioncache) · [Benchmarks](#measured-api-usage) · [MCP tools](#use-the-mcp-tools) · [한국어](README.ko.md) · [简体中文](README.zh-CN.md)
 
 ## How it works
 
