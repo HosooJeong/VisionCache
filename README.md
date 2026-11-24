@@ -6,7 +6,20 @@ VisionCache is a local MCP server for Windows and macOS. It gives agents a scale
 
 **42.2% fewer API input tokens** in a live Windows word-processing benchmark. Input fell from **4,188 to 2,422 tokens per run**, and both capture modes completed all three trials. [See the benchmark](#measured-api-usage)
 
-[Quickstart](#quickstart) · [npm](https://www.npmjs.com/package/visioncache) · [Benchmarks](#measured-api-usage) · [MCP tools](#use-the-mcp-tools) · [한국어](README.ko.md)
+[Before and after](#how-it-works) · [Quickstart](#quickstart) · [npm](https://www.npmjs.com/package/visioncache) · [Benchmarks](#measured-api-usage) · [MCP tools](#use-the-mcp-tools) · [한국어](README.ko.md)
+
+## How it works
+
+Here is what the agent receives when a storage-bin warning appears in the same Windows test window.
+
+| Before · Full-resolution capture | After · VisionCache adaptive capture |
+| --- | --- |
+| <img src="docs/images/capture-full.png" alt="Full stock intake window with a storage-bin warning on the right" width="440"><br>**Entire window** · 1024 × 640 | <img src="docs/images/capture-adaptive-overview.png" alt="Scaled stock intake overview with the form and warning still in view" width="440"><br>**1. Scaled overview** · 512 × 320 |
+| | <img src="docs/images/capture-adaptive-crop.png" alt="Native-resolution warning crop reading Storage bin unavailable and Replacement bin B-154" width="233"><br>**2. Native-resolution warning crop** · 233 × 86 |
+
+The overview keeps the whole form in view. The crop makes the replacement bin **B-154** readable at its original resolution. In the main window, VisionCache adds a crop when new small text or a red warning is detected. These PNGs came from VisionCache's Rust MCP server running against a test app with sample data.
+
+On supported foreground dialogs, adaptive mode captures the dialog at native resolution. The connected MCP client decides where to send the images and metadata.
 
 ## Quickstart
 
@@ -36,20 +49,6 @@ With a text editor open, ask your agent to use VisionCache.
 > Use VisionCache to inspect the open text editor and tell me which controls are visible.
 
 In Codex, you can explicitly select `$visioncache-desktop` for a desktop task.
-
-## How it works
-
-By default, the agent gets a scaled PNG of the selected window. When a change contains small text or a red warning, VisionCache adds a native-resolution crop of that region.
-
-```mermaid
-flowchart LR
-    Window["Selected desktop window"] --> VisionCache
-    VisionCache -->|"Scaled overview"| Agent["AI agent"]
-    VisionCache -. Native crop when needed .-> Agent
-    Agent -->|"Click, scroll, or type via MCP"| VisionCache
-```
-
-On supported foreground dialogs, adaptive mode captures the dialog at native resolution. The Rust server runs locally over stdio. The connected client decides where to send the images and metadata.
 
 ## Measured API usage
 

@@ -6,7 +6,18 @@ VisionCache는 Windows와 macOS에서 AI 에이전트가 MCP로 데스크톱 앱
 
 Windows 문서 편집기 실측에서 **API 입력 토큰이 42.2% 줄었다.** 실행당 **4,188개에서 2,422개**로 줄었고, 두 방식 모두 3회 중 3회 성공했다. [실측 결과](#api-사용량-실측)
 
-[영문 README](README.md) · [npm](https://www.npmjs.com/package/visioncache) · [설치 가이드](INSTALL.md) · [실험 재현](benchmarks/README.md)
+[적용 전후](#동작-방식) · [빠른 시작](#빠른-시작) · [영문 README](README.md) · [npm](https://www.npmjs.com/package/visioncache) · [실험 재현](benchmarks/README.md)
+
+## 동작 방식
+
+같은 Windows 테스트 창에 보관함 오류가 표시됐을 때 에이전트가 받는 이미지를 비교했다.
+
+| 적용 전 · 전체 창 원본 | 적용 후 · VisionCache 조건부 캡처 |
+| --- | --- |
+| <img src="docs/images/capture-full.png" alt="오른쪽에 보관함 오류가 표시된 재고 입고 창 전체" width="440"><br>**전체 창** · 1024 × 640 | <img src="docs/images/capture-adaptive-overview.png" alt="입력 폼과 오류 위치를 보여주는 축소 화면" width="440"><br>**1. 창 전체 축소 화면** · 512 × 320 |
+| | <img src="docs/images/capture-adaptive-crop.png" alt="대체 보관함 B-154가 보이는 오류 영역 원본" width="233"><br>**2. 오류 영역 원본** · 233 × 86 |
+
+축소본으로 창 전체의 배치를 파악하고, 오류 영역의 원본에서 대체 보관함 **B-154**를 읽을 수 있다. 본창에서 작은 글씨나 붉은 경고가 새로 감지될 때만 해당 영역을 추가한다. 그림은 예시 데이터를 넣은 테스트 앱에서 VisionCache의 Rust MCP 서버가 반환한 PNG다.
 
 ## 빠른 시작
 
